@@ -1,3 +1,22 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+This repo is a set of agent skills (slash commands and behaviours) for Claude Code, Codex, and other Agent-Skills-compatible harnesses, shipped as a Claude Code plugin and via [skills.sh](https://skills.sh/mattpocock/skills). There is no application code to build, lint, or test: the substance is `SKILL.md` prose plus a little shell and JS for validation and release.
+
+## Commands
+
+- `claude plugin validate . --strict`: validate the plugin manifests after touching `.claude-plugin/plugin.json` or `.claude-plugin/marketplace.json`.
+- `npm run changeset`: interactively create a changeset entry under `.changeset/`, one per change; consumed by `npm run version` on release.
+- `npm run version`: consume pending changesets into `CHANGELOG.md`, bump `package.json`, and copy that version into `.claude-plugin/plugin.json` (runs `changeset version && node scripts/sync-plugin-version.mjs`).
+- `npm run check-plugin-version`: guard that exits 1 if `plugin.json`'s version has drifted from `package.json`'s.
+- `scripts/link-skills.sh`: symlink every skill outside `deprecated/` and `misc/` into `~/.claude/skills` and `~/.agents/skills` for local development. Re-run after adding, removing, or renaming a skill.
+- `scripts/list-skills.sh`: print every `SKILL.md` path in the repo.
+
+Release: pushing to `main` runs `.github/workflows/release.yml`, which opens a "chore: version skills" PR via `changesets/action` when changesets are pending.
+
+## Structure and invariants
+
 Skills are organized into bucket folders under `skills/`:
 
 - `engineering/`: daily code work
@@ -8,7 +27,7 @@ Skills are organized into bucket folders under `skills/`:
 
 Every skill in `engineering/` or `productivity/` (the **promoted** buckets) must have a reference in the top-level `README.md` and an entry in `.claude-plugin/plugin.json`'s `skills` array (the Claude Code plugin ships exactly the promoted set). Skills in `misc/`, `in-progress/`, and `deprecated/` must not appear in either.
 
-Install commands are copied verbatim from [.agents/install-block.md](./.agents/install-block.md). `.claude-plugin/marketplace.json` makes the repo its own single-plugin marketplace (a fallback the install block explains, not the documented route). Run `claude plugin validate . --strict` after touching either manifest. Why a Claude plugin but not (yet) a Codex one lives in [.agents/adr/0002-ship-as-a-claude-code-plugin.md](./.agents/adr/0002-ship-as-a-claude-code-plugin.md).
+Install commands are copied verbatim from [.agents/install-block.md](./.agents/install-block.md). `.claude-plugin/marketplace.json` makes the repo its own single-plugin marketplace (a fallback the install block explains, not the documented route). Run `claude plugin validate . --strict` after touching either manifest. `.claude-plugin/plugin.json`'s `version` must track `package.json`'s (Claude uses it to decide when installed users see an update); bump both together via `npm run version` (see Commands). Why a Claude plugin but not (yet) a Codex one lives in [.agents/adr/0002-ship-as-a-claude-code-plugin.md](./.agents/adr/0002-ship-as-a-claude-code-plugin.md).
 
 Each skill entry in the top-level `README.md` must link the skill name to its `SKILL.md`.
 
@@ -16,7 +35,7 @@ Each bucket folder has a `README.md` that lists every skill in the bucket with a
 
 Skills in `engineering/` and `productivity/` also have a human-facing docs page at `docs/<bucket>/<skill-name>.md` (the docs tree mirrors those two bucket folders under `skills/`). The published URL is `https://aihero.dev/skills-<skill-name>` regardless of bucket: the docs path is repo organisation only. When you add, rename, or change the behaviour of a skill in `engineering/` or `productivity/`, create or re-sync its docs page following [.agents/writing-docs.md](./.agents/writing-docs.md). A finished page carries four sections: **What it does**, **When to reach for it**, **Common questions**, and **It's working if**. `writing-docs.md` holds the template, the section order, and where to hunt for the questions. Skills in the non-promoted buckets (`misc/`, `in-progress/`, `deprecated/`) get **no** docs page.
 
-Every `SKILL.md` is either user-invoked (`disable-model-invocation: true` plus `policy.allow_implicit_invocation: false` in `agents/openai.yaml`, reachable only by the human) or model-invoked (model- or user-reachable). See [.agents/invocation.md](./.agents/invocation.md).
+Every `SKILL.md` is either user-invoked (`disable-model-invocation: true` plus `policy.allow_implicit_invocation: false` in `agents/openai.yaml`, reachable only by the human) or model-invoked (model- or user-reachable). See [.agents/invocation.md](./.agents/invocation.md). When one skill's steps need to fire another, instruct the agent to `Call the Skill tool with "<name>"`, one skill per call; a user-invoked skill can never be reached this way, so phrase its precondition as an instruction to the human instead.
 
 [`ask-matt`](./skills/engineering/ask-matt/SKILL.md) is the router that maps every user-reachable skill and how they relate. The same trigger that re-syncs a docs page applies to it: whenever you add, rename, remove, or change how a user-reachable skill fits the flows, re-read `ask-matt`'s `SKILL.md` and update it so the map stays accurate: a new skill it never mentions, or a stale one it still routes to, is a router that lies.
 
